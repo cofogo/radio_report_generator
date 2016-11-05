@@ -132,8 +132,3 @@ string get_cell_text(unsigned _col_num, string _s, char _delim)
 	++start; //skipping the delimiter itself
 	cout << "DEBUG: substr len/start/ed: " << substr_len << "/" << start << "/" << end << endl;
 	return _s.substr(start, substr_len);
-<<<<<<< HEAD
-}
-=======
-}
->>>>>>> b6e273c6453f1cca7bb91302badc928b407ae654
