@@ -16,9 +16,7 @@ using std::string;
 #include <vector>
 using std::vector;
 
-/*vector<unsigned short> get_key_col_numbers(vector<string> _conts, string _row,
-																					 char _delim);*/
-string get_cell_text(unsigned _col_num, string _s, char _delim);
+string version("v0.9.01");
 
 struct cell {
 	cell(string _c, unsigned _x) : contents(_c), x_pos(_x) {}
@@ -27,12 +25,25 @@ struct cell {
 	unsigned x_pos;
 };
 
+struct record {
+	record(string _ti, string _ar) : title(_ti), artist(_ar), times_aired(1)
+	{};
+	
+	string title;
+	string artist;
+	unsigned times_aired;
+};
+
+string get_cell_text(unsigned _col_num, string _s, char _delim);
+void add_unique(const record& _src, vector<record>& _dest);
+
 int main()
 {
 	char delim = ',';
 	string raw_file_path = "raw_files/";
+	string processed_file_path = "processed_files/";
 	
-	cout << "Welcome to the Radio Report Generator\n\n";
+	cout << "Welcome to the Radio Report Generator " << version << "\n\n";
 	cout << "All the files you wish to process should be located inside the\n"
 					"'raw_files' directory\n\n";
 
@@ -61,64 +72,49 @@ int main()
 	// reading the header
 	getline(inp_stream, linebuffer);
 	
-	unsigned test_iter = 5;
+	vector<record> records;
 	unsigned itr = 0;
 	while(!inp_stream.eof()) {
 		++itr;
 		getline(inp_stream, linebuffer);
 		cout << "line no." << itr << endl;
-		cout << get_cell_text(key_columns[0].x_pos, linebuffer, delim);
-		cout << ", " << get_cell_text(key_columns[1].x_pos, linebuffer, delim);
-		cout << endl;
-		//TODO
-		/* Get key column numbers
-		 * get key column fields for each row
-		 * if there was allready such a combination, increase occurance counter
-		 * else add new entry to memory with occurance counter set to 1
-		 * */
-		test_iter++;
-		if(test_iter == 0) {break;}
+		
+		string title = get_cell_text(key_columns[0].x_pos, linebuffer, delim);
+		string artist = get_cell_text(key_columns[1].x_pos, linebuffer, delim);
+		if(title == "" && artist == "") {continue;}
+		
+		record rec(title, artist);
+		add_unique(rec, records);
 	}
-	//TODO generate the report from entries in memory
 	
+	/*
+	cout << "***RECORDS***\n";
+	for(unsigned i = 0; i < records.size(); ++i) {
+		cout << records[i].title << " | " << records[i].times_aired << endl;
+	}
+	*/
+	
+	ofstream out_stream;
+	out_stream.open(processed_file_path + "proc_" + inp_filename);
+	
+	out_stream << key_columns[0].contents << "," << key_columns[1].contents <<
+	              "," << "TIMES AIRED" << endl;
+	if(out_stream.fail()) {
+		cerr << "ERROR: Failed to open file '" << inp_filename << "' for writing\n";
+		cerr << "The program will now exit.\n";
+		return 1;
+	}
+	
+	cout << "***WRITING TO FILE***\n";
+	for(unsigned i = 0; i < records.size(); ++i) {
+		out_stream << records[i].title << "," << records[i].artist << "," <<
+		              records[i].times_aired << endl;
+	}
+	
+	out_stream.close();
 	inp_stream.close();
 	return 0;
 }
-/*
-vector<unsigned short> get_key_col_numbers(vector<string> _conts, string _row,
-																					 char _delim)
-{
-	vector<unsigned short> ret_key_col_numbers;
-	
-	size_t col_start = 0, col_end = 0;
-	for(unsigned i = 0; i < _conts.size(); ++i) {
-		unsigned short col_number = 0;
-		
-		while(col_end != string::npos) {
-			col_start = _row.find(_delim, col_end + 1);
-			col_end = _row.find(_delim, col_start + 1);
-			
-			cerr << "DEBUG\n";
-			cerr << "col_start = " << col_start << endl;
-			cerr << "col_end = " << col_end << endl;
-			
-			if(col_end < 2) {
-				cerr << "ERROR: Unexpected input file format!\n";
-				cerr << "The program will now exit.";
-			}
-			//adjusting cell text bounds for the single " mark at cell borders
-			size_t col_text_start = col_start + 2;
-			size_t col_text_end = col_end - 2;
-			size_t col_text_len = (col_text_end - col_text_start) - 1;
-			
-			if(_row.compare(col_text_end, col_text_len, _conts[i]) == 0) {
-				ret_key_col_numbers.push_back(col_number);
-			}
-			
-			++col_number;
-		}
-	}
-}*/
 
 string get_cell_text(unsigned _col_num, string _s, char _delim)
 {
@@ -126,9 +122,21 @@ string get_cell_text(unsigned _col_num, string _s, char _delim)
 	for(unsigned i = 0; i != _col_num; ++i) {
 		if(end == string::npos) {return "";}
 		start = end + 1;
-		end = _s.find(_delim);
+		end = _s.find(_delim, start);
 	}
-	size_t substr_len = end - start - 1;
-	++start; //skipping the delimiter itself
+	size_t substr_len = end - start;
 	cout << "DEBUG: substr len/start/ed: " << substr_len << "/" << start << "/" << end << endl;
 	return _s.substr(start, substr_len);
+}
+
+void add_unique(const record& _src, vector<record>& _dest)
+{
+	for(unsigned i = 0; i < _dest.size(); ++i) {
+		if(_src.title == _dest[i].title && _src.artist == _dest[i].artist) {
+			++_dest[i].times_aired;
+			return;
+		}
+	}
+	
+	_dest.push_back(_src);
+}
