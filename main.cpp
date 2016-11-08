@@ -16,7 +16,7 @@ using std::string;
 #include <vector>
 using std::vector;
 
-string version("v0.9.01");
+string version("v0.09.02");
 
 struct cell {
 	cell(string _c, unsigned _x) : contents(_c), x_pos(_x) {}
@@ -34,12 +34,13 @@ struct record {
 	unsigned times_aired;
 };
 
-string get_cell_text(unsigned _col_num, string _s, char _delim);
+string get_cell_text(unsigned _col_num, string _s, char _delim, char _tx_delim);
 void add_unique(const record& _src, vector<record>& _dest);
 
 int main()
 {
 	char delim = ',';
+	char txt_delim = '"';
 	string raw_file_path = "raw_files/";
 	string processed_file_path = "processed_files/";
 	
@@ -79,8 +80,10 @@ int main()
 		getline(inp_stream, linebuffer);
 		cout << "line no." << itr << endl;
 		
-		string title = get_cell_text(key_columns[0].x_pos, linebuffer, delim);
-		string artist = get_cell_text(key_columns[1].x_pos, linebuffer, delim);
+		string title = get_cell_text(key_columns[0].x_pos, linebuffer,
+		                             delim, txt_delim);
+		string artist = get_cell_text(key_columns[1].x_pos, linebuffer,
+		                              delim, txt_delim);
 		if(title == "" && artist == "") {continue;}
 		
 		record rec(title, artist);
@@ -100,7 +103,7 @@ int main()
 	out_stream << key_columns[0].contents << "," << key_columns[1].contents <<
 	              "," << "TIMES AIRED" << endl;
 	if(out_stream.fail()) {
-		cerr << "ERROR: Failed to open file '" << inp_filename << "' for writing\n";
+		cerr << "ERROR: Failed to open file 'proc_" << inp_filename << "' for writing\n";
 		cerr << "The program will now exit.\n";
 		return 1;
 	}
@@ -116,15 +119,22 @@ int main()
 	return 0;
 }
 
-string get_cell_text(unsigned _col_num, string _s, char _delim)
+string get_cell_text(unsigned _col_num, string _s, char _delim, char _tx_delim)
 {
 	size_t start = 0, end = 0;
+	if(_s.size() == 0) {return "";}
+	
 	for(unsigned i = 0; i != _col_num; ++i) {
 		if(end == string::npos) {return "";}
-		start = end + 1;
-		end = _s.find(_delim, start);
+		
+		if(end > 0) {start = end + 1;} //if not first column - move start right of delimiter
+		if(end > 0 && _s[end] == _tx_delim) {++start;} //if last cell was of text type - have to move start another position
+		if(_s[start] == _tx_delim) {end = _s.find(_tx_delim, start + 1);} //if cell contents are text = set end to text delimiter
+		else {end = _s.find(_delim, start);} //else set end to next column delimiter
 	}
+	
 	size_t substr_len = end - start;
+	if(_s[start] == _tx_delim) {++substr_len;} //if cell is of text type - include text delimiter in output
 	cout << "DEBUG: substr len/start/ed: " << substr_len << "/" << start << "/" << end << endl;
 	return _s.substr(start, substr_len);
 }
