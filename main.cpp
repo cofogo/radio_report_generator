@@ -16,7 +16,7 @@ using std::string;
 #include <vector>
 using std::vector;
 
-string version = "v1.00";
+string version = "v1.10";
 
 struct cell {
 	cell(string _c, unsigned _x) : contents(_c), x_pos(_x) {}
@@ -38,13 +38,31 @@ struct record {
 
 string get_cell_text(unsigned _col_num, string _s, char _delim, char _tx_delim);
 //TODO update_recordset - implement key-based uniqueness, key to be passed as argument (vector<cell>)
-void update_recordset(const record& _src, vector<record>& _dest); //updates passed recordset (_dest) by adding passed record if _rec is unique, otherwise iterates existing record in _dest
-unsigned strtime_to_n(string _s, char _txt_delim = '"'); //takes string time contents formatted as "00:00:00" and returns seconds
+int update_recordset(const record& _src, vector<record>& _dest, char _txt_delim); //updates passed recordset (_dest) by adding passed record if _rec is unique, otherwise iterates existing record in _dest
+unsigned strtime_to_n(string _s, char _txt_delim, bool& _flag_err); //takes string time contents formatted as "00:00:00" and returns seconds
 
 int main()
 {
-	char delim = ',';
-	char txt_delim = '"';
+	//read and set values from config
+	string config_filename = "raregen.cfg";
+	ifstream config_stream;
+	config_stream.open(config_filename);
+	if(config_stream.fail()) {
+		cerr << "ERROR: Failed to open config file '" << config_filename << "' for reading\n";
+		cerr << "The program will now exit.\n";
+		return 1;
+	}
+
+	string linebuffer;
+
+	getline(config_stream, linebuffer);
+	char delim = linebuffer.back();
+
+	getline(config_stream, linebuffer);
+	char txt_delim = linebuffer.back();
+
+	//paths hardcoded for now
+	//TODO make a proper separate config reading procedure (use a map probably)
 	string raw_file_path = "raw_files/";
 	string processed_file_path = "processed_files/";
 	
@@ -76,10 +94,11 @@ int main()
 	// included columns
 	const cell head_duration("ACTDUR", 5);
 	
-	string linebuffer;
+	linebuffer;
 	// reading the header
 	getline(inp_stream, linebuffer);
 	
+	unsigned iter = 0;
 	vector<record> records;
 	while(!inp_stream.eof()) {
 		getline(inp_stream, linebuffer);
@@ -93,8 +112,13 @@ int main()
 		if(title == "" && artist == "") {continue;}
 		
 		record rec(title, artist, rec_length);
-		update_recordset(rec, records);
+		if(update_recordset(rec, records, txt_delim) < 0) {
+			//something was not right with this line, show
+			cout << "line: " << iter << endl;
+		}
+		++iter;
 	}
+	inp_stream.close();
 	
 	/*
 	cout << "***RECORDS***\n";
@@ -124,7 +148,6 @@ int main()
 	}
 	
 	out_stream.close();
-	inp_stream.close();
 	return 0;
 }
 
@@ -148,27 +171,31 @@ string get_cell_text(unsigned _col_num, string _s, char _delim, char _tx_delim)
 	return _s.substr(start, substr_len);
 }
 
-void update_recordset(const record& _src, vector<record>& _dest)
+int update_recordset(const record& _src, vector<record>& _dest, char _txt_delim)
 {
 	for(unsigned i = 0; i < _dest.size(); ++i) {
 		if(_src.title == _dest[i].title && _src.artist == _dest[i].artist) {
 			++_dest[i].times_aired;
 			
+			bool flag_err = false;
 			// normalizing time, as DAD sometimes cuts songs off too early
-			unsigned src_dur = strtime_to_n(_src.duration);
-			unsigned dest_dur = strtime_to_n(_dest[i].duration);
+			unsigned src_dur = strtime_to_n(_src.duration, _txt_delim, flag_err);
+			if(flag_err) {return -1;}
+			unsigned dest_dur = strtime_to_n(_dest[i].duration, _txt_delim, flag_err);
+			if(flag_err) {return -1;}
 			if(src_dur > dest_dur) {
 				_dest[i].duration = _src.duration;
 			}
 			
-			return;
+			return 0;
 		}
 	}
 	
 	_dest.push_back(_src);
+	return 0;
 }
 
-unsigned strtime_to_n(string _s, char _txt_delim)
+unsigned strtime_to_n(string _s, char _txt_delim, bool& _flag_err)
 {
 	//dealing with text delimiters
 	if(_s[0] == _txt_delim) {
@@ -179,6 +206,7 @@ unsigned strtime_to_n(string _s, char _txt_delim)
 	
 	if(_s[2] != ':' || _s[5] != ':') {
 		cerr << "WARNING: Encountered wrong duration time format!\n";
+		_flag_err = true;
 		return 0;
 	}
 	

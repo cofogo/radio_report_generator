@@ -1,9 +1,9 @@
 CC = g++
 STD = -std=c++11
 SRC = main.cpp
-OUT = radio_rep_gen.exe
+OUT = raregen.exe
 
-all : radio_rep_gen
+all : raregen
 
-radio_rep_gen : ${SRC}
+raregen : ${SRC}
 	${CC} ${STD} ${SRC} -o ${OUT}
